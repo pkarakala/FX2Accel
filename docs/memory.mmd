@@ -1,8 +1,7 @@
 %% Memory planning / buffer reuse (polished)
 flowchart LR
   %% Using concise nodes to indicate lifetimes
-  L0[lin\nstart:0 end:0] --> L1[lin_relu\nstart:1 end:1] --> L2[out\nstart:2 end:2]
-  note right of L1: reuse buffer0 (lin -> lin_relu)
+  L0["lin start:0 end:0"] --> L1["lin_relu start:1 end:1"] --> L2["out start:2 end:2"]
 
 %% Caption: Planner computes lifetimes and reuses buffers when live ranges
 %% do not overlap to reduce peak memory.

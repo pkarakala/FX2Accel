@@ -1,9 +1,9 @@
 %% Parameter-aware lowering and validation
 flowchart LR
-  PM[PyTorch: params (w,b,dtype)] --> FX[FX / Graph IR\n(metadata)]
-  FX --> TIR[Tensor IR\n(attrs: weight,bias,dtype)]
-  TIR --> NP[NumPy Backend\n(execute using attrs)]
-  NP --> CMP[Compare vs PyTorch\n(max abs diff)]
+  PM["PyTorch params (w,b,dtype)"] --> FX["FX / Graph IR metadata"]
+  FX --> TIR["Tensor IR attrs: weight,bias,dtype"]
+  TIR --> NP["NumPy Backend execute"]
+  NP --> CMP["Compare vs PyTorch"]
 
 %% Caption: Shows parameter extraction during lowering and how backends
 %% validate numerical equivalence against PyTorch.

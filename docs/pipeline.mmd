@@ -1,20 +1,20 @@
 %% Pipeline diagram for FX2Accel (polished)
 flowchart LR
   subgraph Capture
-    Py[PyTorch] --> FX[FX Capture]
-    FX --> SP[ShapeProp]
+    Py["PyTorch"] --> FX["FX Capture"]
+    FX --> SP["ShapeProp"]
   end
 
   subgraph Lower
-    SP --> G[Graph IR]
-    G --> P[Passes]\n(DCE + Fusion)
-    P --> T[Tensor IR]
+    SP --> G["Graph IR"]
+    G --> P["Passes (DCE + Fusion)"]
+    P --> T["Tensor IR"]
   end
 
   subgraph Backends
-    T --> M[Memory Planner]
-    M --> N[NumPy]
-    M --> A[Accel Codegen]
+    T --> M["Memory Planner"]
+    M --> N["NumPy"]
+    M --> A["Accel Codegen"]
   end
 
 %% Caption: Grouped view clarifies stages and where shapes/params/lifetimes

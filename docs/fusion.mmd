@@ -1,11 +1,11 @@
 %% Fusion before / after (polished)
 flowchart LR
   subgraph Before
-    X[x] --> L[Linear] --> R[ReLU] --> O[Out]
+    X["x"] --> L["Linear"] --> R["ReLU"] --> O["Out"]
   end
 
   subgraph After
-    X2[x] --> F[Linear_ReLU] --> O2[Out]
+    X2["x"] --> F["Linear_ReLU"] --> O2["Out"]
   end
 
 %% Caption: Simple before/after shows the benefit of folding a Linear+ReLU
