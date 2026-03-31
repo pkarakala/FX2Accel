@@ -1,0 +1,5 @@
+
+# Core runtime and testing dependencies
+numpy
+torch
+pytest
