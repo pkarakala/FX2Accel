@@ -21,6 +21,8 @@ building blocks of such toolchains in a small, readable codebase:
 This repo is useful for learning about ML compiler design, experimenting with
 fusion and memory strategies, and prototyping accelerator backends.
 
+Building this pipeline surfaced why hardware-aware decisions must be made at the IR level — for example, buffer reuse during memory planning directly mirrors the constraint of minimizing costly DRAM accesses in favor of keeping tensors in on-chip SRAM. Lifetime analysis only works if shapes are fully resolved before the planner runs, which is why ShapeProp is a hard dependency before any lowering step. These constraints exist in real accelerator SDKs for the same reasons they appear here: silicon is unforgiving about memory traffic and op ordering.
+
 Compiler pipeline
 -----------------
 This guided walkthrough contains a set of concise, GitHub-friendly Mermaid
