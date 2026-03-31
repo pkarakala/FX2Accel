@@ -23,87 +23,103 @@ fusion and memory strategies, and prototyping accelerator backends.
 
 Compiler pipeline
 -----------------
-High-level flow implemented in this repo:
+This guided walkthrough contains a set of concise, GitHub-friendly Mermaid
+diagrams that explain the pipeline, key optimizations, memory planning
+principles, parameter-aware lowering, and the repository layout. Each
+subsection includes a short technical caption explaining why the diagram
+matters for ML compiler design and accelerator SDKs.
 
-PyTorch model
-	-> FX graph capture (symbolic_trace + ShapeProp)
-	-> Graph IR (nodes with metadata and parameter extraction)
-	-> optimization passes (dead code elimination, metadata-based op fusion)
-	-> Tensor IR (ordered tensor ops with attributes/parameters)
-	-> memory planning (liveness, peak memory, buffer reuse)
-	-> backends:
-			 - NumPy backend (executes Tensor IR with real parameters)
-			 - Toy accelerator codegen (emits pseudo-instructions)
+1) Pipeline overview
+```mermaid
+flowchart LR
+	subgraph Capture
+		A[PyTorch] --> B[FX Capture]
+		B --> C[ShapeProp]
+	end
 
-Repository structure
---------------------
-- `frontend/` — FX capture and shape propagation helpers
-- `lowering/` — lowering from FX -> Graph IR -> Tensor IR
-- `ir/` — IR data structures (`GraphIR`, `TensorIR`)
-- `passes/` — optimization passes (fusion, dead-code elimination, constant folding)
-- `memory/` — simple memory planner and buffer reuse
-- `backend/` — `numpy_backend` (execution) and `accel_backend` (toy codegen)
-- `models/` — small example models (e.g., `SimpleMLP`)
-- `tests/` — test suite validating pipeline correctness
-- `main.py` — demo runner that exercises the full pipeline
+	subgraph Lowering
+		C --> D[Graph IR]
+		D --> E[Passes]\n(DCE + Fusion)
+		E --> F[Tensor IR]
+	end
 
-Implemented features
---------------------
-- Graph IR with node metadata and parameter extraction for `nn.Linear`
-- Tensor IR with canonical parameter attributes (weights in (out, in) layout)
-- Metadata-driven op fusion (linear -> relu -> linear_relu)
-- Dead code elimination (backward reachability)
-- Simple memory planner with lifetime analysis and buffer reuse
-- NumPy backend to execute Tensor IR and validate numerics against PyTorch
-- Toy accelerator instruction generator (readable pseudo-assembly)
-
-Example output
---------------
-Below is a short, realistic sample produced by `main.py`.
-
-Graph IR before passes:
-
+	subgraph Backends
+		F --> G[Memory Planner]
+		G --> H[NumPy]
+		G --> I[Accel Codegen]
+	end
 ```
-x | input | inputs=[] | shape=(1, 4)
-lin | operation | inputs=['x'] | shape=(1, 4)
-relu | operation | inputs=['lin'] | shape=(1, 4)
-out | operation | inputs=['relu'] | shape=(1, 4)
-output | output | inputs=['out'] | shape=(1, 4)
-```
+Caption: Shows where capture, lowering, passes, and backend work happen; the
+subgraph grouping clarifies stages and where invariants (shapes, params,
+lifetimes) are produced or consumed.
 
-Graph IR after passes:
+2) Graph optimization: before / after fusion
+```mermaid
+flowchart LR
+	subgraph Before
+		X(x) --> L(linear) --> R(relu) --> O(out)
+	end
 
+	subgraph After
+		X2(x) --> FR(linear_relu) --> O2(out)
+	end
 ```
-x | input | inputs=[] | shape=(1, 4)
-lin_relu_fused | linear_relu | inputs=['x'] | shape=(1, 4)
-out | operation | inputs=['lin_relu_fused'] | shape=(1, 4)
-output | output | inputs=['out'] | shape=(1, 4)
-```
+Caption: Collapsing a linear->relu chain into `linear_relu` reduces op
+count and enables fused kernels on accelerators.
 
-Tensor IR (ops):
-
+3) Memory planning & buffer reuse (lifetime view)
+```mermaid
+flowchart LR
+	%% timeline-like, intentionally simple for GitHub
+	L0[lin\nstart:0 end:0] --> L1[lin_relu\nstart:1 end:1] --> L2[out\nstart:2 end:2]
+	note right of L1: reuse buffer0 (lin -> lin_relu)
 ```
-lin_relu_fused | linear_relu | inputs=['x'] | output=lin_relu_fused | shape=(1, 4)
-out | operation | inputs=['lin_relu_fused'] | output=out | shape=(1, 4)
-```
+Caption: Lifetime analysis results allow the planner to reuse buffers when
+live ranges do not overlap, reducing peak memory on-device.
 
-Memory planner summary:
-
+4) Backend codegen flow (instruction selection example)
+```mermaid
+flowchart LR
+	T[TIR ops] --> S[Instr Select]
+	S --> A[ASM: LOAD/MATMUL/RELU/STORE]
+	A --> EX[Example: LOAD x; LINEAR_RELU out <- x; STORE out]
 ```
-Lifetimes:
-	lin_relu_fused: start=0, end=1
-	out: start=1, end=1
-Estimated peak memory: 32 bytes
-```
+Caption: Instruction selection maps Tensor IR ops to low-level sequences
+that an accelerator backend can schedule or emit.
 
-Toy accelerator instructions (excerpt):
-
+5) Parameter-aware lowering & validation
+```mermaid
+flowchart LR
+	PM[PyTorch Params] --> FX[FX / Graph IR\n(metadata)]
+	FX --> TIR[Tensor IR\n(attributes: weight,bias,dtype)]
+	TIR --> NP[NumPy Backend\n(execute)]
+	NP --> CMP[Compare vs PyTorch]
 ```
-LOAD x
-LINEAR_RELU lin_relu_fused <- x
-STORE lin_relu_fused
-MATMUL out <- lin_relu_fused
-STORE out
+Caption: Parameters (weights, bias, dtype) are extracted into IR attributes
+during lowering so backends can execute numerically-equivalent kernels and
+validate outputs against PyTorch.
+
+6) Repository map
+```mermaid
+flowchart TB
+	subgraph repo[FX2Accel]
+		FE[frontend]\n(Capture & Shape) --> IR[ir]\nIR --> PASS[passes]\nPASS --> LOW[lowering]\nLOW --> MEM[memory]\nMEM --> BACK[backend]\nBACK --> MODELS[models]\nMODELS --> TESTS[tests]\n+    UTIL[utils]
+	end
+	click FE "frontend/" "Frontend: FX capture and ShapeProp"
+	click IR "ir/" "IR data structures"
+	click PASS "passes/" "Optimization passes"
+	click LOW "lowering/" "Lowering logic"
+	click MEM "memory/" "Memory planner"
+	click BACK "backend/" "Backends (NumPy, accel)"
+	click MODELS "models/" "Example models"
+	click TESTS "tests/" "Test suite"
+	click UTIL "src/utils" "Utilities"
+```
+Caption: High-level map of repository folders and their roles; useful when
+exploring where to extend lowering, add passes, or implement new backends.
+
+Standalone diagram files are available under `docs/` for editing or
+embedding in other docs sites. See `docs/*.mmd`.
 ```
 
 PyTorch vs NumPy backend comparison:
@@ -147,6 +163,90 @@ Future work
 - Broaden fusion patterns and use operator/type metadata robustly
 - Replace heuristic allocator with a cost-based memory scheduler
 - Emit real accelerator code or export to an external runtime/SDK
+
+Visual Compiler Walkthrough
+---------------------------
+This section provides compact, GitHub-friendly Mermaid diagrams that
+visualize the core compiler stages and decisions. Each diagram includes a
+short caption explaining why the view matters for ML compilers and
+accelerator SDKs.
+
+Pipeline overview
+~~~~~~~~~~~~~~~~~
+```mermaid
+flowchart LR
+	A[PyTorch Model] --> B[FX Graph Capture]
+	B --> C[Shape Propagation]
+	C --> D[Graph IR]
+	D --> E[Optimization Passes]\n(DCE + Op Fusion)
+	E --> F[Tensor IR]
+	F --> G[Memory Planning]
+	G --> H[NumPy Backend]
+	G --> I[Toy Accelerator Codegen]
+```
+Caption: End-to-end flow from high-level PyTorch model capture through IR
+lowering, passes, and backend codegen — useful for understanding where
+invariants (shapes, params, lifetimes) are maintained or transformed.
+
+Graph optimization (before / after fusion)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```mermaid
+flowchart LR
+	subgraph Before
+		x_in(x)
+		lin(linear)
+		rel(relu)
+		out(out)
+		x_in --> lin --> rel --> out
+	end
+
+	subgraph After
+		x2(x)
+		fused(linear_relu)
+		out2(out)
+		x2 --> fused --> out2
+	end
+```
+Caption: Fusion collapses a linear -> relu chain into a single fused op,
+reducing IR size and opening opportunities for combined kernels on
+accelerators.
+
+Memory planning / buffer reuse
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```mermaid
+flowchart LR
+	%% Simple lifetime / reuse depiction
+	lin[lin\n(lifetime: t0)]
+	linrelu[linear_relu_fused\n(lifetime: t1)]
+	out[ out\n(lifetime: t2)]
+
+	lin --> linrelu --> out
+	note right of linrelu: reuse buffer0 (lin -> lin_relu)
+```
+Caption: The planner computes lifetimes and can reuse buffers when lifetimes
+do not overlap, lowering peak memory needs on constrained devices.
+
+Backend codegen flow
+~~~~~~~~~~~~~~~~~~~~
+```mermaid
+flowchart LR
+	TIR[Tensor IR ops] --> S[instruction selection]
+	S --> ASM[toy accelerator pseudo-assembly]
+	ASM -->|example| EX[LOAD x; LINEAR_RELU out <- x; STORE out]
+```
+Caption: Backend lowering translates Tensor IR into low-level instructions
+that would be scheduled or emitted for an accelerator (here shown as
+illustrative LOAD/MATMUL/RELU/STORE/LINEAR_RELU).
+
+Standalone diagram files
+------------------------
+For convenience each diagram is also available as a standalone Mermaid file
+under `docs/` so the visuals can be edited independently:
+
+- `docs/pipeline.mmd`
+- `docs/fusion.mmd`
+- `docs/memory.mmd`
+- `docs/backend_codegen.mmd`
 
 Contributing & license
 ----------------------

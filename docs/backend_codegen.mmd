@@ -1,0 +1,8 @@
+%% Backend codegen flow (polished)
+flowchart LR
+  T[TIR ops] --> IS[Instr Select]
+  IS --> ASM[ASM seq]
+  ASM --> EX[LOAD x; LINEAR_RELU out <- x; STORE out]
+
+%% Caption: Instr selection maps TIR ops into low-level sequences suitable
+%% for an accelerator emitter or scheduler.

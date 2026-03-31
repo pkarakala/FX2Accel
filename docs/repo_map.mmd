@@ -1,0 +1,16 @@
+%% Repository map
+flowchart TB
+  subgraph FX2Accel
+    FE[frontend]\nFE_desc[Capture & ShapeProp]
+    IR[ir]\nIR_desc[IR data structures]
+    PASS[passes]\nPASS_desc[Optimization passes]
+    LOW[lowering]\nLOW_desc[Lowering logic]
+    MEM[memory]\nMEM_desc[Memory planner]
+    BACK[backend]\nBACK_desc[NumPy + Accel]
+    MODELS[models]\nMODELS_desc[Example models]
+    TESTS[tests]\nTESTS_desc[Test suite]
+    UTIL[utils]\nUTIL_desc[Helpers]
+  end
+
+%% Caption: High-level map of folders and responsibilities to help new
+%% contributors find relevant code.
